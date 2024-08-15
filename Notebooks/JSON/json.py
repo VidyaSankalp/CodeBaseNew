@@ -4,7 +4,7 @@ read_df = spark\
     .read\
     .format("json")\
     .option("multiLine","true") \
-    .load("s3://vidya-sankalp/datasets/json/json/Adalberto916_Orn563_b897a48b-cd8b-b118-7887-caa29321f6a3.json")
+    .load("s3://prudhvi-08052024-test/json")
 
 # read_df = spark\
 #     .read\
@@ -12,7 +12,8 @@ read_df = spark\
 #     .load("s3://vidya-sankalp-datasets/corrupt_json/corrupt_json.json")
 
 # Display the DataFrame
-# display(read_df)
+print(read_df.count())
+display(read_df)
 
 # COMMAND ----------
 
@@ -67,12 +68,18 @@ corrupted_record_df, non_corrupted_records_df = identify_json_corrupt_records(re
 
 # COMMAND ----------
 
+if corrupted_record_df:
+    print(corrupted_record_df.count())
+print(non_corrupted_records_df.count())
+
+# COMMAND ----------
+
 # MAGIC %sql
 # MAGIC -- Create or replace temporary view using JSON format and specifying the path, multiline option, and inferSchema option
 # MAGIC CREATE OR REPLACE TEMPORARY VIEW temp_view
 # MAGIC USING json
 # MAGIC OPTIONS (
-# MAGIC   path 's3://vidya-sankalp-datasets/health-care/json', 
+# MAGIC   path 's3://prudhvi-08052024-test/json', 
 # MAGIC   multiLine 'true',
 # MAGIC   inferSchema 'true'
 # MAGIC );
@@ -85,13 +92,13 @@ corrupted_record_df, non_corrupted_records_df = identify_json_corrupt_records(re
 
 # How to select columns from a column with a datatype of struct
 # Display the selected attributes from the DataFrame
-display(non_corrupted_records_df.select("attributes.age", "attributes.AGE_MONTHS", "attributes.C19_FULLY_VACCINATED", "attributes.C19_SCHEDULED_FIRST_SHOT"))
+# display(non_corrupted_records_df.select("attributes.age", "attributes.AGE_MONTHS", "attributes.C19_FULLY_VACCINATED", "attributes.C19_SCHEDULED_FIRST_SHOT"))
 
-# Display the selected attributes from the DataFrame with renamed columns
-display(non_corrupted_records_df.selectExpr("attributes.age", "attributes.age_months", "attributes.C19_FULLY_VACCINATED as covid19_FULLY_VACCINATED", "attributes.C19_SCHEDULED_FIRST_SHOT as covid19_scheduled_first_shot"))
+# # Display the selected attributes from the DataFrame with renamed columns
+# display(non_corrupted_records_df.selectExpr("attributes.age", "attributes.age_months", "attributes.C19_FULLY_VACCINATED as covid19_FULLY_VACCINATED", "attributes.C19_SCHEDULED_FIRST_SHOT as covid19_scheduled_first_shot"))
 
 # Display all attributes from the DataFrame
-# display(non_corrupted_records_df.selectExpr("attributes.*"))
+display(non_corrupted_records_df.selectExpr("attributes.*").select('age','age_months',"C19_FULLY_VACCINATED"))
 
 # COMMAND ----------
 
@@ -101,10 +108,10 @@ transform_df1 = non_corrupted_records_df.selectExpr("coverage","symptoms","recor
 
 # COMMAND ----------
 
-required_columns = ["first_name","middle_name","last_name","gender","age","age_months","marital_status","employment_condition.name as employment_type","birth_city","address","county","city","state","alcoholic","smoker",'disabled','household_size','uninsured',"C19_FULLY_VACCINATED","C19_SCHEDULED_FIRST_SHOT","diabetes_stage.name","diabetes","hypertension_severe",'immunizations',"bmi_percentile","coverage","symptoms","record"]
+required_columns = ["first_name","middle_name","last_name","gender","age","age_months","marital_status","employment_condition.name as employment_type","birth_city","address","county","city","state","alcoholic","smoker",'disabled','household_size','uninsured',"C19_FULLY_VACCINATED","C19_SCHEDULED_FIRST_SHOT","diabetes_stage.name","hypertension_severe",'immunizations',"bmi_percentile","coverage","symptoms","record"]
 
 transform_df2 = transform_df1.selectExpr(required_columns)
-# transform_df2.printSchema()
+transform_df2.printSchema()
 # display(transform_df2)
 
 # COMMAND ----------
@@ -134,9 +141,9 @@ transform_df3 = transform_df3.withColumn("household_size_category",
                                          .otherwise("Large"))
 
 # Create a new column "diabetes_category" that indicates if a person has diabetes or not
-transform_df3 = transform_df3.withColumn("diabetes_category",
-                                         when(transform_df2.diabetes == 'true', "Diabetic")
-                                         .otherwise("Non-Diabetic"))
+# transform_df3 = transform_df3.withColumn("diabetes_category",
+#                                          when(transform_df2.diabetes == 'true', "Diabetic")
+#                                          .otherwise("Non-Diabetic"))
 # # Create a new column "hypertension_severe_category" that indicates if a person has severe hypertension or not
 transform_df3 = transform_df3.withColumn("hypertension_severe_category",
                                          when(transform_df2.hypertension_severe == 'true', "Severe Hypertension")
@@ -147,12 +154,12 @@ required_columns_transformed = ["first_name", "middle_name", "last_name", "gende
                                 "marital_status","immunizations", "employment_type_category", "birth_city", "address", "county",
                                 "city", "state", "alcoholic_status", "smoker_status", "disabled", "household_size",
                                 "household_size_category", "uninsured", "C19_FULLY_VACCINATED",
-                                "C19_SCHEDULED_FIRST_SHOT", "diabetes_category", "bmi_percentile","hypertension_severe_category",
+                                "C19_SCHEDULED_FIRST_SHOT",  "bmi_percentile","hypertension_severe_category",
                                 "coverage", "symptoms", "record"]
 
 transformed_df = transform_df3.selectExpr(required_columns_transformed)
-# transformed_df.printSchema()
-# display(transformed_df)
+transformed_df.printSchema()
+display(transformed_df)
 
 # COMMAND ----------
 
@@ -160,7 +167,8 @@ from pyspark.sql.functions import expr, when, from_unixtime
 
 # Convert the C19_SCHEDULED_FIRST_SHOT column from milliseconds to seconds and cast it to a timestamp
 transformed_df = transformed_df.withColumn("C19_SCHEDULED_FIRST_SHOT_seconds", transformed_df.C19_SCHEDULED_FIRST_SHOT / 1000)
-transformed_df = transformed_df.withColumn("C19_SCHEDULED_FIRST_SHOT_timestamp", from_unixtime(transformed_df.C19_SCHEDULED_FIRST_SHOT_seconds).cast("timestamp"))
+transformed_df = transformed_df.withColumn("C19_SCHEDULED_FIRST_SHOT_timestamp", from_unixtime(transformed_df.C19_SCHEDULED_FIRST_SHOT_seconds, 'yyyy-MM-dd HH:mm:ss').cast("timestamp"))
+
 
 # Extract the date, day, month, year, hour, minute, and second from the C19_SCHEDULED_FIRST_SHOT_timestamp column
 transformed_df = transformed_df.withColumn("date", transformed_df.C19_SCHEDULED_FIRST_SHOT_timestamp.cast("date"))
@@ -184,11 +192,15 @@ transformed_df = transformed_df.withColumn("date_add", expr("date_add(C19_SCHEDU
 transformed_df_with_date = transformed_df.withColumn("date_sub", expr("date_sub(C19_SCHEDULED_FIRST_SHOT_timestamp, 7)"))
 
 
-# display(transformed_df_with_date)
+display(transformed_df_with_date)
 
 # COMMAND ----------
 
 transformed_df_with_date.printSchema()
+
+# COMMAND ----------
+
+display(transformed_df_with_date.select(col('immunizations')))
 
 # COMMAND ----------
 
@@ -205,7 +217,8 @@ def get_immunizations(immunizations):
 
     # Iterate through the dictionary and add each immunization to the set
     for k,v in immunizations.items():
-        immunizations_list.add(k)
+        if len(v) > 0:
+            immunizations_list.add(k)
 
     # Convert the set to a list and return it
     return list(immunizations_list)
@@ -217,7 +230,14 @@ get_immunizations_udf = udf(get_immunizations, ArrayType(StringType()))
 transformed_df = transformed_df_with_date.withColumn("immunizations_array", get_immunizations_udf(col('immunizations')))
 
 # Display the transformed DataFrame
-# display(transformed_df)
+display(transformed_df)
+
+# COMMAND ----------
+
+spark.udf.register("get_immunizations_sql", get_immunizations, ArrayType(StringType()))
+transformed_df_with_date.createOrReplaceGlobalTempView(name='transformed_df_with_date')
+
+display(spark.sql("select get_immunizations_sql(immunizations) as immunizations_array from global_temp.transformed_df_with_date"))
 
 # COMMAND ----------
 
@@ -254,7 +274,7 @@ transformed_df.createOrReplaceTempView(name='transformed_df_with_date')
 # COMMAND ----------
 
 # Register the get_immunizations UDF with Spark
-spark.udf.register('get_immunizations_udf', get_immunizations)
+spark.udf.register('get_immunizations_udf', get_immunizations,  ArrayType(StringType()))
 #spark.udf.register('get_immunizations_udf', get_immunizations, ArrayType(StringType()))
 
 # COMMAND ----------
@@ -330,9 +350,9 @@ spark.udf.register('get_immunizations_values_udf', get_immunizations_values)
 from pyspark.sql.functions import udf, col
 from pyspark.sql.types import ArrayType, StructType, StringType, StructField, IntegerType,MapType
 
-json_schema = ArrayType(MapType(StringType(),ArrayType(IntegerType())))
+udf_return_type = ArrayType(MapType(StringType(),ArrayType(IntegerType())))
 # Define a User Defined Function (UDF) to extract unique immunizations values from a dictionary
-@udf(json_schema)
+@udf(udf_return_type)
 def get_immunizations_as_json(immunizations):
     # Convert the immunizations column to a dictionary
     immunizations = immunizations.asDict()
@@ -415,6 +435,64 @@ df.show()
 
 # COMMAND ----------
 
+from pyspark.sql import functions as F
+
+df = transformed_df_with_date.withColumn(
+    "immunizations_values",
+    F.expr("get_immunizations_values_udf(immunizations)")
+).withColumn(
+    "flatten_immunizations_values",
+    F.expr("flatten(immunizations_values)")
+).withColumn(
+    "immunizations_converted_map",
+    F.expr("get_immunizations_as_json_udf(immunizations)")
+).withColumn(
+    "immunizations_values_flatten",
+    F.expr("TRANSFORM(flatten_immunizations_values, x -> from_unixtime(x))")
+).withColumn(
+    "immunizations_transformed_values",
+    F.expr("""
+        TRANSFORM(
+            immunizations_converted_map, 
+            outer_item -> 
+                        TRANSFORM_VALUES(
+                                outer_item, (k, v) -> 
+                                        TRANSFORM(v, x -> from_unixtime(x)
+                        )
+            )
+        )
+    """)
+)
+
+"""
+
+"""
+
+display(df)
+
+# COMMAND ----------
+
+aList = [
+    {"covid19": [405017750, -1470749546]},
+    {"dtap": []},
+    {"flu": [322235542, 979529878, -1930608490, -545779562, 1443849366, -861489002, 1128139926, -1177198442, 812430486, -1492907882, 496721046, -1808617322, 181011606, -2124326762, -134697834, 1854931094, -450407274, 1539221654, -766116714, -301797226, 162522262, 626841750, 1091161238, 1555480726, 696338582, 2019800214, 126286998, 1204279446, -794222442, -1714731882, 1659725974, 739216534, 1694474390, -610863978, 1378764950, -926573418, 1063055510, -1242282858, 747346070, -1557992298, 431636630, -1873701738, 115927190, 2105556118, -199782250, 1789846678, -515491690, 1474137238]},
+    {"hepa": []}
+]
+
+output_list = []
+for outer_item in aList:
+    output_dict = {}
+    for k,v in outer_item.items():
+       tmp_lst = []
+       for inner_item in v:
+           tmp_lst.append(datetime.fromtimestamp(inner_item).strftime("%Y-%m-%d %H:%M:%S"))
+       output_dict[k] = tmp_lst
+    output_list.append(output_dict)
+           
+print(output_list)
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC Some of the Important In-build Spark functions to Know
 
@@ -436,8 +514,8 @@ list_of_rows = [
 df = spark.createDataFrame(list_of_rows, schema="student_no int, first_name string, last_name string, yearly_percentage string,  yearly_percentage_map string,schools_list array<string>, joining_date timestamp")
 
 # Approach 2: Creating DataFrame using RDD
-rdd = spark.sparkContext.parallelize(list_of_rows)
-df = spark.createDataFrame(rdd, schema="student_no int, first_name string, last_name string, yearly_percentage string,yearly_percentage_map string,schools_list array<string>, joining_date timestamp")
+# rdd = spark.sparkContext.parallelize(list_of_rows)
+# df = spark.createDataFrame(rdd, schema="student_no int, first_name string, last_name string, yearly_percentage string,yearly_percentage_map string,schools_list array<string>, joining_date timestamp")
 
 # Display the DataFrame
 display(df)
@@ -493,6 +571,8 @@ ready_for_explode
 """
 
 exploded_df = spark.sql(sql_code)
+
+display(exploded_df)
 
 
 # COMMAND ----------
@@ -576,6 +656,7 @@ display(df.intersect(df2))
 It is used to return the rows from the first DataFrame that are not present in the second DataFrame, including duplicates. This is similar to the EXCEPT operation, but EXCEPT ALL does not remove duplicates from the result set.
 """
 display(df.exceptAll(df2))
+display(df.exceptAll(df2).distinct())
 
 # COMMAND ----------
 
