@@ -10,7 +10,6 @@ def read_data_from_file(spark, bucket_name, format,options,path):
 # COMMAND ----------
 
 def read_data_from_sql(spark, sql_query):
-    # Reads data from a specified S3 bucket and folder prefix, inferring schema and using the first row as headers
     return spark.sql(sql_query)
 
 # COMMAND ----------
@@ -31,6 +30,26 @@ def write_data(df, bucket_name, database_name, write_mode, path):
             .mode(write_mode)\
             .option("path", path)\
             .saveAsTable(f"{database_name}.{folder_prefix}")
+
+# COMMAND ----------
+
+def write_partitions_data(df, database_name, table_name,write_mode, partition_columns,path):
+    # Writes the DataFrame to a Parquet file in the specified S3 bucket and folder prefix
+    # Parameters:
+    # df: The DataFrame to write
+    # bucket_name: The name of the S3 bucket where the data will be written
+    # database_name: The name of the database to associate the table with
+    # write_mode: The write mode (e.g., append, overwrite)
+    # folder_prefix: The folder prefix within the bucket to write the data to
+    
+    # The data is written in Parquet format to the specified path and also saved as a table in the database
+    return df\
+            .write\
+            .format("parquet")\
+            .mode(write_mode)\
+            .option("path", path)\
+            .partitionBy(partition_columns)\
+            .saveAsTable(f"{database_name}.{table_name}")
 
 # COMMAND ----------
 
@@ -62,6 +81,18 @@ table_name = f"{catalog_name}.{schema_name}.claims_transcations"
 
 # COMMAND ----------
 
+
+
+read_path = f"s3://{source_bucket_name}/dataset/claims_transcations"
+# Read data from the source bucket for the current folder prefix
+df = read_data_from_file(spark, source_bucket_name, 'csv', options,read_path)
+# Write the DataFrame to the destination bucket and register it as a table in the database
+write_path = f"s3://{destination_bucket_name}/dataset/parition_by/parquet/claims_transcations/"
+
+write_partitions_data(df, database_name, 'claims_transactions_partition' ,write_mode, ['PROCEDURECODE'],write_path)
+
+# COMMAND ----------
+
 # Loop through each folder prefix to process the data
 for folder_prefix in folder_prefixes:
     read_path = f"s3://{source_bucket_name}/dataset/{folder_prefix}"
@@ -80,6 +111,16 @@ sql_query = f"""
 
 df = read_data_from_sql(spark, sql_query)
 display(df)
+
+# COMMAND ----------
+
+sql_query = f"""
+    SELECT * FROM lakehouse_dev.health_care.claims_transactions_partition where procedurecode = '10'
+"""
+
+df = read_data_from_sql(spark, sql_query)
+display(df)
+# df.write.format('parquet').save(f"s3://{source_bucket_name}/dataset/claims_transcations_dummy")
 
 # COMMAND ----------
 
