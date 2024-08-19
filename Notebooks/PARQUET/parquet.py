@@ -81,8 +81,6 @@ table_name = f"{catalog_name}.{schema_name}.claims_transcations"
 
 # COMMAND ----------
 
-
-
 read_path = f"s3://{source_bucket_name}/dataset/claims_transcations"
 # Read data from the source bucket for the current folder prefix
 df = read_data_from_file(spark, source_bucket_name, 'csv', options,read_path)
@@ -145,6 +143,10 @@ display(df)
 # COMMAND ----------
 
 table_name = f"{database_name}.claims_transcations"
+
+# COMMAND ----------
+
+spark.conf.set("spark.sql.adaptive.enabled", "false")
 
 # COMMAND ----------
 
