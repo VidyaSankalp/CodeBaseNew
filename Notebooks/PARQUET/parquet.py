@@ -146,7 +146,7 @@ table_name = f"{database_name}.claims_transcations"
 
 # COMMAND ----------
 
-spark.conf.set("spark.sql.adaptive.enabled", "false")
+spark.conf.set("spark.sql.adaptive.enabled", "true")
 
 # COMMAND ----------
 
@@ -186,9 +186,37 @@ display(spark.sql(sql_query))
 
 # COMMAND ----------
 
+sql_query = f"""
+SELECT * FROM (SELECT 
+ PATIENTID, 
+ TYPE,
+ AMOUNT,
+ DENSE_RANK() OVER(PARTITION BY TYPE ORDER BY AMOUNT DESC) as rank 
+FROM
+{table_name}) where rank <= 2
+"""
+
+display(spark.sql(sql_query))
+
+# COMMAND ----------
+
+
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ### Ranking Patients by Total Charges
 # MAGIC Rank patients based on their total charges, allowing you to see who the top spenders are.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC         id   code  value
+# MAGIC row1 - 1001, 2000, 3000 1 1 1
+# MAGIC row2 - 1002, 2000, 3000 1 1 2
+# MAGIC row3 - 1003, 2000, 4000 3 2 3
+# MAGIC row4 - 1004, 2001, 4000 1 1 1
+# MAGIC
 
 # COMMAND ----------
 
@@ -196,7 +224,9 @@ sql_query = f"""
 SELECT 
     PATIENTID, 
     SUM(AMOUNT) AS TOTAL_AMOUNT,
-    RANK() OVER (ORDER BY SUM(AMOUNT) DESC) AS RANKING
+    RANK() OVER (ORDER BY SUM(AMOUNT) DESC) AS RANKING,
+    DENSE_RANK() OVER (ORDER BY SUM(AMOUNT) DESC) AS DENSE_RANKING,
+    ROW_NUMBER() OVER (ORDER BY SUM(AMOUNT) DESC) AS ROW_NUMBER
 FROM 
     {table_name}
 GROUP BY
@@ -233,7 +263,16 @@ display(spark.sql(sql_query))
 
 # COMMAND ----------
 
-
+sql_query = f"""
+SELECT * FROM (SELECT
+  procedurecode,
+  units,
+  DEPARTMENTID,
+  DENSE_RANK() OVER(PARTITION BY DEPARTMENTID ORDER BY units DESC) as rank
+FROM 
+ {table_name}) WHERE rank <= 3
+"""
+display(spark.sql(sql_query))
 
 # COMMAND ----------
 
@@ -374,23 +413,28 @@ Lagged_Amounts AS (
         --  Retrieves the AVG_MONTHLY_AMOUNT from the same month of the previous year for each patient.
         --  The data is partitioned by PATIENTID and MONTH, ensuring that the LAG function only considers the previous year's data within the same month for each patient.
         --  The data is ordered by YEAR within each partition to ensure the correct calculation of the lagged value.
-        LAG(AVG_MONTHLY_AMOUNT) OVER (PARTITION BY PATIENTID, MONTH ORDER BY YEAR) AS PREVIOUS_YEAR_AMOUNT
+        LAG(AVG_MONTHLY_AMOUNT) OVER (PARTITION BY PATIENTID, MONTH ORDER BY YEAR) AS PREVIOUS_YEAR_AMOUNT,
+        LEAD(AVG_MONTHLY_AMOUNT) OVER (PARTITION BY PATIENTID, MONTH ORDER BY YEAR) AS YEAR_LEAD_AMOUNT
     FROM 
         Monthly_Averages
 )
+
+-- 3. Calculating the Change and Filtering the Results
+
 -- 3. Calculating the Change and Filtering the Results
 SELECT 
     PATIENTID, 
     YEAR, 
     MONTH, 
     AVG_MONTHLY_AMOUNT,
+    PREVIOUS_YEAR_AMOUNT,
     -- This calculates the difference between the current year's average monthly amount and the previous year's corresponding month.
     (AVG_MONTHLY_AMOUNT - PREVIOUS_YEAR_AMOUNT) AS AMOUNT_CHANGE
 FROM 
     Lagged_Amounts
-WHERE 
+--WHERE 
     --  This condition ensures that only records with a valid PREVIOUS_YEAR_AMOUNT are included in the final result, filtering out any rows where the lagged value is NULL
-    PREVIOUS_YEAR_AMOUNT IS NOT NULL
+    --PREVIOUS_YEAR_AMOUNT IS NOT NULL
 ORDER BY 
     PATIENTID, 
     MONTH, 
@@ -436,15 +480,17 @@ display(df)
 # MAGIC %sql
 # MAGIC SELECT 
 # MAGIC     PATIENTID, 
-# MAGIC     CLAIMID, 
-# MAGIC     FROMDATE, 
-# MAGIC     AMOUNT,
+# MAGIC     FROMDATE,
 # MAGIC     LAG(FROMDATE) OVER (PARTITION BY PATIENTID ORDER BY FROMDATE) AS PREVIOUS_CHARGE_DATE,
 # MAGIC     LEAD(FROMDATE) OVER (PARTITION BY PATIENTID ORDER BY FROMDATE) AS NEXT_CHARGE_DATE,
 # MAGIC     DATEDIFF(FROMDATE, LAG(FROMDATE) OVER (PARTITION BY PATIENTID ORDER BY FROMDATE)) AS DAYS_SINCE_LAST_CHARGE,
 # MAGIC     DATEDIFF(LEAD(FROMDATE) OVER (PARTITION BY PATIENTID ORDER BY FROMDATE), FROMDATE) AS DAYS_UNTIL_NEXT_CHARGE
-# MAGIC FROM 
-# MAGIC     lakehouse_dev.health_care.claims_transcations;
+# MAGIC FROM
+# MAGIC     (SELECT 
+# MAGIC         DISTINCT  PATIENTID, 
+# MAGIC                   FROMDATE   
+# MAGIC     FROM 
+# MAGIC         lakehouse_dev.health_care.claims_transcations)
 # MAGIC
 
 # COMMAND ----------
@@ -470,3 +516,11 @@ patient_growth = df.withColumn("YEAR", year("FROMDATE")) \
 top_n_patients = patient_growth.orderBy(col("GROWTH_RATE").desc()).limit(10)
 
 display(top_n_patients)
+
+# COMMAND ----------
+
+query_sql = """
+SELECT * FROM lakehouse_dev.health_care.allergies
+"""
+
+df = spark.sql(query_sql)
