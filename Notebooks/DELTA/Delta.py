@@ -179,6 +179,18 @@ for source_sink in source_sinks:
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC https://www.databricks.com/blog/2020/05/29/adaptive-query-execution-speeding-up-spark-sql-at-runtime.html
+# MAGIC https://spark.apache.org/docs/latest/sql-performance-tuning.html#coalescing-post-shuffle-partitions
+
+# COMMAND ----------
+
+spark.conf.set("spark.sql.adaptive.enabled", "true")
+# spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "1G")
+# spark.conf.set("spark.sql.shuffle.partitions", "200")
+
+# COMMAND ----------
+
 # MAGIC %sql
 # MAGIC SELECT 
 # MAGIC   * 
@@ -196,7 +208,7 @@ for source_sink in source_sinks:
 from pyspark.sql import SparkSession
 
 # Initialize Spark session
-spark = SparkSession.builder.appName("Healthcare Data Join").getOrCreate()
+# spark = SparkSession.builder.appName("Healthcare Data Join").getOrCreate()
 
 # Load the tables into DataFrames
 delta_patients = spark.read.format("delta").table("lakehouse_dev.health_care.delta_paitents")
