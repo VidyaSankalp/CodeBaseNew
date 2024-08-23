@@ -250,6 +250,7 @@ display(result)
 
 # MAGIC %md
 # MAGIC https://www.sqlshack.com/implementing-slowly-changing-dimensions-scds-in-data-warehouses/
+# MAGIC https://docs.delta.io/latest/delta-update.html
 
 # COMMAND ----------
 
