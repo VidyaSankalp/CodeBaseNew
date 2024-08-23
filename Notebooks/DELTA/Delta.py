@@ -245,3 +245,12 @@ result = delta_claims_transactions \
 
 # Display the result
 display(result)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC https://www.sqlshack.com/implementing-slowly-changing-dimensions-scds-in-data-warehouses/
+
+# COMMAND ----------
+
+
