@@ -38,6 +38,12 @@ jdbc_df = spark.read.jdbc(url=jdbc_url, table= f"(select * from customer) as foo
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC install highligted libraries
+# MAGIC # ![](/Workspace/Users/xyzprudhvi@gmail.com/CodeBaseNew/Notebooks/DELTA/libraries.png)
+
+# COMMAND ----------
+
 display(jdbc_df)
 
 # COMMAND ----------
