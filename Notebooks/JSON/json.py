@@ -4,7 +4,7 @@ read_df = spark\
     .read\
     .format("json")\
     .option("multiLine","true") \
-    .load("s3://prudhvi-08052024-test/json")
+    .load("/Volumes/lakehouse/test/healthcare/databricks-pratice/json")
 
 # read_df = spark\
 #     .read\
@@ -94,11 +94,12 @@ print(non_corrupted_records_df.count())
 # Display the selected attributes from the DataFrame
 # display(non_corrupted_records_df.select("attributes.age", "attributes.AGE_MONTHS", "attributes.C19_FULLY_VACCINATED", "attributes.C19_SCHEDULED_FIRST_SHOT"))
 
-# # Display the selected attributes from the DataFrame with renamed columns
+# Display the selected attributes from the DataFrame with renamed columns
 # display(non_corrupted_records_df.selectExpr("attributes.age", "attributes.age_months", "attributes.C19_FULLY_VACCINATED as covid19_FULLY_VACCINATED", "attributes.C19_SCHEDULED_FIRST_SHOT as covid19_scheduled_first_shot"))
 
 # Display all attributes from the DataFrame
-display(non_corrupted_records_df.selectExpr("attributes.*").select('age','age_months',"C19_FULLY_VACCINATED"))
+flattend_atribute_df = non_corrupted_records_df.selectExpr("attributes.*")
+display(flattend_atribute_df.select('age','age_months',"C19_FULLY_VACCINATED"))
 
 # COMMAND ----------
 
@@ -108,7 +109,7 @@ transform_df1 = non_corrupted_records_df.selectExpr("coverage","symptoms","recor
 
 # COMMAND ----------
 
-required_columns = ["first_name","middle_name","last_name","gender","age","age_months","marital_status","employment_condition.name as employment_type","birth_city","address","county","city","state","alcoholic","smoker",'disabled','household_size','uninsured',"C19_FULLY_VACCINATED","C19_SCHEDULED_FIRST_SHOT","diabetes_stage.name","hypertension_severe",'immunizations',"bmi_percentile","coverage","symptoms","record"]
+required_columns = ["first_name","middle_name","last_name","gender","age","age_months","marital_status","employment_condition.name as employment_type","birth_city","address","county","city","state","alcoholic","smoker",'disabled','household_size','uninsured',"C19_FULLY_VACCINATED","C19_SCHEDULED_FIRST_SHOT","hypertension_severe",'immunizations',"bmi_percentile","coverage","symptoms","record"]
 
 transform_df2 = transform_df1.selectExpr(required_columns)
 transform_df2.printSchema()
@@ -163,7 +164,7 @@ display(transformed_df)
 
 # COMMAND ----------
 
-from pyspark.sql.functions import expr, when, from_unixtime
+from pyspark.sql.functions import expr, when, from_unixtime,add_months,month,day
 
 # Convert the C19_SCHEDULED_FIRST_SHOT column from milliseconds to seconds and cast it to a timestamp
 transformed_df = transformed_df.withColumn("C19_SCHEDULED_FIRST_SHOT_seconds", transformed_df.C19_SCHEDULED_FIRST_SHOT / 1000)
@@ -172,7 +173,8 @@ transformed_df = transformed_df.withColumn("C19_SCHEDULED_FIRST_SHOT_timestamp",
 
 # Extract the date, day, month, year, hour, minute, and second from the C19_SCHEDULED_FIRST_SHOT_timestamp column
 transformed_df = transformed_df.withColumn("date", transformed_df.C19_SCHEDULED_FIRST_SHOT_timestamp.cast("date"))
-transformed_df = transformed_df.withColumn("day", expr("dayofmonth(C19_SCHEDULED_FIRST_SHOT_timestamp)"))
+# transformed_df = transformed_df.withColumn("day", expr("dayofmonth(C19_SCHEDULED_FIRST_SHOT_timestamp)"))
+transformed_df = transformed_df.withColumn("day", day(col("C19_SCHEDULED_FIRST_SHOT_timestamp")))
 transformed_df = transformed_df.withColumn("month", expr("month(C19_SCHEDULED_FIRST_SHOT_timestamp)"))
 transformed_df = transformed_df.withColumn("year", expr("year(C19_SCHEDULED_FIRST_SHOT_timestamp)"))
 transformed_df = transformed_df.withColumn("hour", expr("hour(C19_SCHEDULED_FIRST_SHOT_timestamp)"))
@@ -276,6 +278,36 @@ transformed_df.createOrReplaceTempView(name='transformed_df_with_date')
 # Register the get_immunizations UDF with Spark
 spark.udf.register('get_immunizations_udf', get_immunizations,  ArrayType(StringType()))
 #spark.udf.register('get_immunizations_udf', get_immunizations, ArrayType(StringType()))
+
+# COMMAND ----------
+
+from pyspark.sql.functions import col, pandas_udf
+from pyspark.sql.types import ArrayType, StringType
+import pandas as pd
+
+# Define a vectorized Pandas UDF
+@pandas_udf(ArrayType(StringType()))
+def get_immunizations(immunizations_series: pd.Series) -> pd.Series:
+    def extract_immunizations(immunizations):
+         immunizations = immunizations.asDict()
+
+        # Create an empty set to store unique immunizations
+        immunizations_list = set()
+
+        # Iterate through the dictionary and add each immunization to the set
+        for k,v in immunizations.items():
+            immunizations_list.add(k)
+
+        # Convert the set to a list and return it
+        return list(immunizations_list)
+    return immunizations_series.apply(lambda immunizations: extract_immunizations(immunizations))
+
+# Apply the Pandas UDF to extract unique immunizations
+transformed_df = transformed_df_with_date.withColumn("immunizations_array", get_immunizations(col('immunizations')))
+
+# Display the transformed DataFrame
+# display(transformed_df)
+
 
 # COMMAND ----------
 
