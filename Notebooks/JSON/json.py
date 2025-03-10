@@ -12,8 +12,8 @@ read_df = spark\
 #     .load("s3://vidya-sankalp-datasets/corrupt_json/corrupt_json.json")
 
 # Display the DataFrame
-print(read_df.count())
-display(read_df)
+# print(read_df.count())
+# display(read_df)
 
 # COMMAND ----------
 
@@ -99,7 +99,7 @@ print(non_corrupted_records_df.count())
 
 # Display all attributes from the DataFrame
 flattend_atribute_df = non_corrupted_records_df.selectExpr("attributes.*")
-display(flattend_atribute_df.select('age','age_months',"C19_FULLY_VACCINATED"))
+# display(flattend_atribute_df.select('age','age_months',"C19_FULLY_VACCINATED"))
 
 # COMMAND ----------
 
@@ -160,7 +160,7 @@ required_columns_transformed = ["first_name", "middle_name", "last_name", "gende
 
 transformed_df = transform_df3.selectExpr(required_columns_transformed)
 transformed_df.printSchema()
-display(transformed_df)
+# display(transformed_df)
 
 # COMMAND ----------
 
@@ -194,7 +194,7 @@ transformed_df = transformed_df.withColumn("date_add", expr("date_add(C19_SCHEDU
 transformed_df_with_date = transformed_df.withColumn("date_sub", expr("date_sub(C19_SCHEDULED_FIRST_SHOT_timestamp, 7)"))
 
 
-display(transformed_df_with_date)
+# display(transformed_df_with_date)
 
 # COMMAND ----------
 
@@ -232,14 +232,14 @@ get_immunizations_udf = udf(get_immunizations, ArrayType(StringType()))
 transformed_df = transformed_df_with_date.withColumn("immunizations_array", get_immunizations_udf(col('immunizations')))
 
 # Display the transformed DataFrame
-display(transformed_df)
+# display(transformed_df)
 
 # COMMAND ----------
 
 spark.udf.register("get_immunizations_sql", get_immunizations, ArrayType(StringType()))
 transformed_df_with_date.createOrReplaceGlobalTempView(name='transformed_df_with_date')
 
-display(spark.sql("select get_immunizations_sql(immunizations) as immunizations_array from global_temp.transformed_df_with_date"))
+# display(spark.sql("select get_immunizations_sql(immunizations) as immunizations_array from global_temp.transformed_df_with_date"))
 
 # COMMAND ----------
 
@@ -276,37 +276,36 @@ transformed_df.createOrReplaceTempView(name='transformed_df_with_date')
 # COMMAND ----------
 
 # Register the get_immunizations UDF with Spark
-spark.udf.register('get_immunizations_udf', get_immunizations,  ArrayType(StringType()))
-#spark.udf.register('get_immunizations_udf', get_immunizations, ArrayType(StringType()))
+spark.udf.register('get_immunizations_udf', get_immunizations)
 
 # COMMAND ----------
 
-from pyspark.sql.functions import col, pandas_udf
-from pyspark.sql.types import ArrayType, StringType
-import pandas as pd
+# from pyspark.sql.functions import col, pandas_udf
+# from pyspark.sql.types import ArrayType, StringType
+# import pandas as pd
 
-# Define a vectorized Pandas UDF
-@pandas_udf(ArrayType(StringType()))
-def get_immunizations(immunizations_series: pd.Series) -> pd.Series:
-    def extract_immunizations(immunizations):
-         immunizations = immunizations.asDict()
+# # Define a vectorized Pandas UDF
+# @pandas_udf(ArrayType(StringType()))
+# def get_immunizations(immunizations_series: pd.Series) -> pd.Series:
+#     def extract_immunizations(immunizations):
+#         immunizations = immunizations.asDict()
 
-        # Create an empty set to store unique immunizations
-        immunizations_list = set()
+#         # Create an empty set to store unique immunizations
+#         immunizations_list = set()
 
-        # Iterate through the dictionary and add each immunization to the set
-        for k,v in immunizations.items():
-            immunizations_list.add(k)
+#         # Iterate through the dictionary and add each immunization to the set
+#         for k,v in immunizations.items():
+#             immunizations_list.add(k)
 
-        # Convert the set to a list and return it
-        return list(immunizations_list)
-    return immunizations_series.apply(lambda immunizations: extract_immunizations(immunizations))
+#         # Convert the set to a list and return it
+#         return list(immunizations_list)
+#     return immunizations_series.apply(lambda immunizations: extract_immunizations(immunizations))
 
-# Apply the Pandas UDF to extract unique immunizations
-transformed_df = transformed_df_with_date.withColumn("immunizations_array", get_immunizations(col('immunizations')))
+# # Apply the Pandas UDF to extract unique immunizations
+# transformed_df = transformed_df_with_date.withColumn("immunizations_array", get_immunizations(col('immunizations')))
 
-# Display the transformed DataFrame
-# display(transformed_df)
+# # Display the transformed DataFrame
+# # display(transformed_df)
 
 
 # COMMAND ----------
@@ -394,7 +393,7 @@ def get_immunizations_as_json(immunizations):
 
     # Iterate through the dictionary and add each immunization to the set
     for k,v in immunizations.items():
-        immunizations_values_list.append({k:[int(item) for item in v]})
+        immunizations_values_list.append({k:v})
     print(immunizations_values_list)
     # Convert the set to a list and return it
     return immunizations_values_list
@@ -430,6 +429,7 @@ FROM(
 """
 
 df = spark.sql(sql_code)
+df.printSchema()
 # Display the DataFrame
 display(df)
 """
@@ -578,9 +578,34 @@ FROM
 
 df_with_converted_from_string_to_json = spark.sql(sql_code)
 
+df_with_converted_from_string_to_json.cache()
+df_with_converted_from_string_to_json.persist(StorageLevel.DISK_ONLY)
+display(df_with_converted_from_string_to_json)
 display(df_with_converted_from_string_to_json)
 
 df_with_converted_from_string_to_json.createOrReplaceTempView("ready_for_explode")
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC select 
+# MAGIC *,
+# MAGIC  from_json(
+# MAGIC         yearly_percentage, 
+# MAGIC         'array<struct<year:int, percentage:string>>'
+# MAGIC   ) as converted_array,
+# MAGIC inline(
+# MAGIC     from_json(
+# MAGIC         yearly_percentage, 
+# MAGIC         'array<struct<year:int, percentage:string>>'
+# MAGIC     )
+# MAGIC )
+# MAGIC from ready_for_explode
+
+# COMMAND ----------
+
+display(ready_for_explode)
+display(ready_for_explode)
 
 # COMMAND ----------
 
@@ -588,7 +613,7 @@ sql_code = """
 SELECT
     *,
     -- explode transforms an array into multiple rows.
-    -- explode(yearly_percentage_array) as yearly_percentage_struct,
+    explode(yearly_percentage_array) as yearly_percentage_struct,
     -- posexplode transforms an array into multiple rows along with the position (index) of each element.
     -- posexplode(yearly_percentage_array) as (pos,yearly_percentage_struct),
     -- explode_outer transforms an array into multiple rows and produces null values if the array is null or empty.(preffered)
@@ -597,7 +622,7 @@ SELECT
     -- posexplode_outer(yearly_percentage_array) as (pos,yearly_percentage_struct)
     -- inline explodes an array of structs into separate columns
     -- Each struct's fields become individual columns in the resulting rows
-    inline(yearly_percentage_array)
+    -- inline(yearly_percentage_array)
 FROM
 ready_for_explode
 """
@@ -679,7 +704,26 @@ display(df.union(df2).distinct())
 """
 unionByName: Similar to union, but matches columns by name rather than by position.
 """
-display(df.unionByName(df2))
+simpleData = [("James","Sales","NY",90000,34,10000), \
+    ("Michael","Sales","NY",86000,56,20000), \
+    ("Robert","Sales","CA",81000,30,23000), \
+    ("Maria","Finance","CA",90000,24,23000) \
+  ]
+
+columns= ["employee_name","department","state","salary","age","bonus"]
+df3 = spark.createDataFrame(data = simpleData, schema = columns)
+
+
+simpleData2 = [("James","Sales","NY",90000,34,10000), \
+    ("Maria","Finance","CA",90000,24,23000), \
+    ("Jen","Finance","NY",79000,53,15000), \
+    ("Jeff","Marketing","CA",80000,25,18009), \
+    ("Kumar","Marketing","NY",91000,50,21000) \
+  ]
+columns2= ["employee_name","department","state","salary","age","bonus2"]
+
+df4 = spark.createDataFrame(data = simpleData2, schema = columns2)
+display(df3.unionByName(df4))
 """
 Returns the common rows between two result sets, eliminating duplicates
 """
@@ -735,4 +779,4 @@ display(df.exceptAll(df2).distinct())
 # MAGIC     ]
 # MAGIC   }' AS raw;
 # MAGIC
-# MAGIC   select array_max(from_json(raw:chicago[*].temp[3],'array<int>')) from temp_data;
+# MAGIC   select array_max(from_json(raw:chicago[*].temp[3],'array<int>')) as max_tmp from temp_data;

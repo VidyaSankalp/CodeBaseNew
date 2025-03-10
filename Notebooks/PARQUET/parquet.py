@@ -1,5 +1,5 @@
 # Databricks notebook source
-def read_data_from_file(spark, bucket_name, format,options,path):
+def read_data_from_file(spark, format,options,path):
     # Reads data from a specified S3 bucket and folder prefix, inferring schema and using the first row as headers
     return spark\
             .read\
@@ -57,12 +57,13 @@ def write_partitions_data(df, database_name, table_name,write_mode, partition_co
 folder_prefixes = ["allergies", "claims_transcations", "claims", "paitents", "payers"]
 
 # Specify the source and destination S3 bucket names
-source_bucket_name = 'prudhvi-08052024-test'
-destination_bucket_name = 'prudhvi-08052024-test'
+source_bucket_name = 'prudhvi-healthcare-01272025'
+destination_bucket_name = 'prudhvi-test-destination-02272025'
+volume = "/Volumes/lakehouse/test/healthcare_input/csv"
 
 # Define the catalog and schema names for the database
-catalog_name = 'lakehouse_dev'
-schema_name = 'health_care'
+catalog_name = 'lakehouse'
+schema_name = 'test'
 
 # Set the write mode for saving data
 write_mode = "overwrite"
@@ -81,22 +82,22 @@ table_name = f"{catalog_name}.{schema_name}.claims_transcations"
 
 # COMMAND ----------
 
-read_path = f"s3://{source_bucket_name}/dataset/claims_transcations"
+read_path = f"{volume}/claims_transcations"
 # Read data from the source bucket for the current folder prefix
-df = read_data_from_file(spark, source_bucket_name, 'csv', options,read_path)
+df = read_data_from_file(spark, 'csv', options,read_path)
 # Write the DataFrame to the destination bucket and register it as a table in the database
-write_path = f"s3://{destination_bucket_name}/dataset/parition_by/parquet/claims_transcations/"
-
+write_path = f"s3://{destination_bucket_name}/parition_by/parquet/claims_transcations/"
+print(read_path, write_path)
 write_partitions_data(df, database_name, 'claims_transactions_partition' ,write_mode, ['PROCEDURECODE'],write_path)
 
 # COMMAND ----------
 
 # Loop through each folder prefix to process the data
 for folder_prefix in folder_prefixes:
-    read_path = f"s3://{source_bucket_name}/dataset/{folder_prefix}"
+    read_path = f"{volume}/{folder_prefix}"
     print(read_path)
     # Read data from the source bucket for the current folder prefix
-    df = read_data_from_file(spark, source_bucket_name, 'csv', options,read_path)
+    df = read_data_from_file(spark, 'csv', options,read_path)
     # Write the DataFrame to the destination bucket and register it as a table in the database
     write_path = f"s3://{destination_bucket_name}/dataset/parquet/{folder_prefix}"
     write_data(df, destination_bucket_name, database_name, write_mode, write_path)
@@ -113,7 +114,7 @@ display(df)
 # COMMAND ----------
 
 sql_query = f"""
-    SELECT * FROM lakehouse_dev.health_care.claims_transactions_partition where procedurecode = '10'
+    SELECT * FROM lakehouse.test.claims_transactions_partition where procedurecode = '10'
 """
 
 df = read_data_from_sql(spark, sql_query)
@@ -175,12 +176,12 @@ display(spark.sql(sql_query))
 
 sql_query = f"""
 SELECT 
-    PATIENTID, 
-    FROMDATE, 
+    PATIENTID,
+    FROMDATE,
     AMOUNT, 
-    SUM(AMOUNT) OVER (PARTITION BY PATIENTID ORDER BY FROMDATE) AS CUMULATIVE_AMOUNT
+    sum(AMOUNT) OVER (PARTITION BY PATIENTID ORDER BY FROMDATE) AS CUMULATIVE_AMOUNT
 FROM 
-    {table_name};
+    {table_name}
 """
 display(spark.sql(sql_query))
 
@@ -200,10 +201,6 @@ display(spark.sql(sql_query))
 
 # COMMAND ----------
 
-
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ### Ranking Patients by Total Charges
 # MAGIC Rank patients based on their total charges, allowing you to see who the top spenders are.
@@ -211,11 +208,14 @@ display(spark.sql(sql_query))
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC rank() over (order by value asc) as rank
+# MAGIC dense_rank() over (order by value asc) as dense_rank
+# MAGIC row_number() over(order by value asc) as row_number
 # MAGIC         id   code  value
 # MAGIC row1 - 1001, 2000, 3000 1 1 1
 # MAGIC row2 - 1002, 2000, 3000 1 1 2
 # MAGIC row3 - 1003, 2000, 4000 3 2 3
-# MAGIC row4 - 1004, 2001, 4000 1 1 1
+# MAGIC row4 - 1004, 2001, 5000 4 3 4
 # MAGIC
 
 # COMMAND ----------
@@ -302,6 +302,13 @@ display(spark.sql(sql_query))
 # MAGIC Z= 180−170/10 = 1
 # MAGIC
 # MAGIC This Z-score of 1 indicates that the person's height is 1 standard deviation above the mean.
+
+# COMMAND ----------
+
+display(spark.sql(f"""
+          SELECT *,ABS(-1) as new_col FROM  {table_name}
+          
+          """))
 
 # COMMAND ----------
 
@@ -413,15 +420,11 @@ Lagged_Amounts AS (
         --  Retrieves the AVG_MONTHLY_AMOUNT from the same month of the previous year for each patient.
         --  The data is partitioned by PATIENTID and MONTH, ensuring that the LAG function only considers the previous year's data within the same month for each patient.
         --  The data is ordered by YEAR within each partition to ensure the correct calculation of the lagged value.
-        LAG(AVG_MONTHLY_AMOUNT) OVER (PARTITION BY PATIENTID, MONTH ORDER BY YEAR) AS PREVIOUS_YEAR_AMOUNT,
+        LAG(AVG_MONTHLY_AMOUNT,2) OVER (PARTITION BY PATIENTID, MONTH ORDER BY YEAR) AS PREVIOUS_YEAR_AMOUNT,
         LEAD(AVG_MONTHLY_AMOUNT) OVER (PARTITION BY PATIENTID, MONTH ORDER BY YEAR) AS YEAR_LEAD_AMOUNT
     FROM 
         Monthly_Averages
-)
-
--- 3. Calculating the Change and Filtering the Results
-
--- 3. Calculating the Change and Filtering the Results
+) 
 SELECT 
     PATIENTID, 
     YEAR, 
@@ -490,7 +493,7 @@ display(df)
 # MAGIC         DISTINCT  PATIENTID, 
 # MAGIC                   FROMDATE   
 # MAGIC     FROM 
-# MAGIC         lakehouse_dev.health_care.claims_transcations)
+# MAGIC         lakehouse.test.claims_transcations)
 # MAGIC
 
 # COMMAND ----------

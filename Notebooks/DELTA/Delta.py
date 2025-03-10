@@ -5,7 +5,7 @@
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC CREATE TABLE IF NOT EXISTS lakehouse_dev.default.test_table1(
+# MAGIC CREATE EXTERNAL TABLE IF NOT EXISTS lakehouse.test.test_table(
 # MAGIC   id INT,
 # MAGIC   name STRING,
 # MAGIC   age INT,
@@ -13,65 +13,70 @@
 # MAGIC   state STRING,
 # MAGIC   salary FLOAT
 # MAGIC )
-# MAGIC USING DELTA
-# MAGIC LOCATION 's3://prudhvi-08052024-test/test_table1'
+# MAGIC LOCATION 's3://prudhvi-healthcare-01272025/test_delta_table/'
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC DESCRIBE HISTORY lakehouse_dev.default.test_table1
+# MAGIC DESCRIBE HISTORY lakehouse.test.test_table
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC INSERT INTO lakehouse_dev.default.test_table1 VALUES (1, 'John', 30, 'New York', 'NY', 100000.0)
+# MAGIC INSERT INTO lakehouse.test.test_table VALUES (1, 'John', 30, 'New York', 'NY', 100000.0)
 
 # COMMAND ----------
 
-
-
-# COMMAND ----------
-
-display(spark.read.parquet("s3://prudhvi-08052024-test/json/part-00000-26c6dee6-96ba-4ca5-bef6-f316581a4b8b-c000.snappy.parquet"))
+display(spark.read.parquet("s3://prudhvi-healthcare-01272025/test_delta_table/part-00000-1b84fc21-82ae-4bdf-a804-7bdc2cebb4d4-c000.snappy.parquet"))
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC INSERT INTO lakehouse_dev.default.test_table1 VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0)
+# MAGIC DESCRIBE HISTORY lakehouse.test.test_table
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC select * from lakehouse_dev.default.test_table1
+# MAGIC INSERT INTO lakehouse.test.test_table VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0)
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC INSERT INTO lakehouse_dev.default.test_table1 VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
-# MAGIC INSERT INTO lakehouse_dev.default.test_table1 VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
-# MAGIC INSERT INTO lakehouse_dev.default.test_table1 VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
-# MAGIC INSERT INTO lakehouse_dev.default.test_table1 VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
-# MAGIC INSERT INTO lakehouse_dev.default.test_table1 VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
-# MAGIC INSERT INTO lakehouse_dev.default.test_table1 VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
-# MAGIC INSERT INTO lakehouse_dev.default.test_table1 VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
-# MAGIC INSERT INTO lakehouse_dev.default.test_table1 VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
-# MAGIC INSERT INTO lakehouse_dev.default.test_table1 VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
+# MAGIC select * from lakehouse.test.test_table
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC INSERT INTO lakehouse.test.test_table VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
+# MAGIC INSERT INTO lakehouse.test.test_table VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
+# MAGIC INSERT INTO lakehouse.test.test_table VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
+# MAGIC INSERT INTO lakehouse.test.test_table VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
+# MAGIC INSERT INTO lakehouse.test.test_table VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
+# MAGIC INSERT INTO lakehouse.test.test_table VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
+# MAGIC INSERT INTO lakehouse.test.test_table VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
+# MAGIC INSERT INTO lakehouse.test.test_table VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
+# MAGIC INSERT INTO lakehouse.test.test_table VALUES (2, 'Prudhvi', 32, 'Rajahmundry', 'RJY', 10000.0);
 # MAGIC
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT * FROM lakehouse_dev.default.test_table1 VERSION AS OF 22
+# MAGIC SELECT * FROM lakehouse.test.test_table VERSION AS OF 22
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC UPDATE lakehouse_dev.default.test_table1 SET age = 33 WHERE id = 1
+# MAGIC SELECT * FROM lakehouse.test.test_table
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC DELETE FROM  lakehouse_dev.default.test_table1 WHERE id = 1
+# MAGIC UPDATE lakehouse.test.test_table SET age = 33 WHERE id = 1
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC DELETE FROM lakehouse.test.test_table WHERE id = 1
 
 # COMMAND ----------
 
@@ -95,7 +100,7 @@ display(spark.read.parquet("s3://prudhvi-08052024-test/json/part-00000-26c6dee6-
 
 # COMMAND ----------
 
-# MAGIC %run /Workspace/Repos/abcprudhvi59@gmail.com/CodeBaseNew/Notebooks/common_utils
+# MAGIC %run ../common_utils
 
 # COMMAND ----------
 
@@ -186,8 +191,46 @@ for source_sink in source_sinks:
 # COMMAND ----------
 
 spark.conf.set("spark.sql.adaptive.enabled", "true")
-# spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "1G")
+spark.conf.set("spark.sql.autoBroadcastJoinThreshold","-1")
+#spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "1G")
 # spark.conf.set("spark.sql.shuffle.partitions", "200")
+
+# COMMAND ----------
+
+# MAGIC
+# MAGIC %sql
+# MAGIC SELECT 
+# MAGIC   * 
+# MAGIC FROM 
+# MAGIC   lakehouse.test.paitents dp
+# MAGIC INNER JOIN 
+# MAGIC   lakehouse.test.claims_transcations dct
+# MAGIC ON dp.id = dct.PATIENTID
+
+# COMMAND ----------
+
+files = dbutils.fs.ls("s3://prudhvi-test-destination-02272025/dataset/parquet/paitents")
+total_size = sum(f.size for f in files)
+size_in_mb = total_size / (1024 * 1024)
+print(f"Total size: {size_in_mb:.2f} MB")
+
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC DESCRIBE DETAIL lakehouse.test.paitents;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT 
+# MAGIC   /*+ BROADCAST(dp) */
+# MAGIC   * 
+# MAGIC FROM 
+# MAGIC   lakehouse.test.paitents dp
+# MAGIC INNER JOIN 
+# MAGIC   lakehouse.test.claims_transcations dct
+# MAGIC ON dp.id = dct.PATIENTID;
 
 # COMMAND ----------
 
