@@ -22,29 +22,29 @@
 
 # COMMAND ----------
 
-connection_details ={
+connection_details = {
     "user": "admin",
     "password": "Root#123",
     "driver": "com.mysql.cj.jdbc.Driver",
-    'partitionColumn':"Id",
-    'lowerBound':str(1),
-    'upperBound':str(100),
-    'numPartitions':str(4)
+    'partitionColumn': "Id",
+    'lowerBound': "301",
+    'upperBound': "500",
+    'numPartitions': "4"
 }
 
-jdbc_url = 'jdbc:mysql://database-2.chas42ia4ujd.ap-south-1.rds.amazonaws.com/employees'
+jdbc_url = 'jdbc:mysql://database-2.cv0g6mqwqu0z.ap-south-1.rds.amazonaws.com:3306/employee'
 
-jdbc_df = spark.read.jdbc(url=jdbc_url, table= f"(select * from customer) as foo",properties=connection_details)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC install highligted libraries
-# MAGIC # ![](/Workspace/Users/xyzprudhvi@gmail.com/CodeBaseNew/Notebooks/DELTA/libraries.png)
-
-# COMMAND ----------
+jdbc_df = spark.read.jdbc(
+    url=jdbc_url,
+    table="(select * from customer) as foo",
+    properties=connection_details
+)
 
 display(jdbc_df)
+
+# COMMAND ----------
+
+jdbc_df.printSchema()
 
 # COMMAND ----------
 
@@ -58,41 +58,47 @@ print(max_timestamp)
 from pyspark.sql.functions import lit
 
 jdbc_df\
-.withColumn('endDate',lit(''))\
-.withColumn('current_status',lit(True))\
+.withColumn('endDate',lit(None).cast("date"))\
+.withColumn('current_status',lit(1))\
 .write.mode("overwrite")\
 .format("delta")\
-.option("path","s3://delta-09042024/customer/")\
-.saveAsTable("test.delta.customer")
+.option("path","s3://prudhvi-test-destination-02272025/customer/")\
+.saveAsTable("lakehouse.test.customer")
 
 # COMMAND ----------
 
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus as urlquote, quote
-engine = create_engine('mysql+pymysql://admin:{}@database-2.chas42ia4ujd.ap-south-1.rds.amazonaws.com/employees'.format(quote('Root#123')), echo=False)
+engine = create_engine('mysql+pymysql://admin:{}@database-2.cv0g6mqwqu0z.ap-south-1.rds.amazonaws.com/employee'.format(quote('Root#123')), echo=False)
 
 # COMMAND ----------
+
+from sqlalchemy import text
 
 table_found = False
 current_process_timestamp = ''
-table_name_table_info = "employees.tables_info"
-statement = "SELECT * from {} where table_name = '{}'".format(table_name_table_info,'customer')
+table_name_table_info = "employee.tables_info"
+statement = text("SELECT * from {} where table_name = 'customer'".format(table_name_table_info))
 print(statement)
-result = engine.execute(statement)
-results = result.fetchall()
-if len(results) > 0:
-    print('Table found')
-    table_found = True
-    current_process_timestamp = results[0][1]
-else:
-    engine.execute("INSERT INTO {} VALUES('{}',null)".format(table_name_table_info,'customer'))
-    print('Table not found')
+
+with engine.connect() as connection:
+    result = connection.execute(statement)
+    results = result.fetchall()
+    if len(results) > 0:
+        print('Table found')
+        table_found = True
+        current_process_timestamp = results[0][1]
+    else:
+        insert_statement = f"INSERT INTO {table_name_table_info} VALUES('customer','{max_timestamp}')"
+        print(insert_statement)
+        connection.execute(text(insert_statement))
+        connection.commit()
+        print('Table not found')
 
 # COMMAND ----------
 
-table_name = "employees.tables_info"
-engine.execute("update {} set next_run_time='{}' where table_name='{}'".format(table_name,max_timestamp,'customer'))
-
-# COMMAND ----------
-
-
+if table_found:
+    with engine.connect() as connection:
+        table_name = "employee.tables_info"
+        connection.execute("update {} set next_run_time='{}' where table_name='{}'".format(table_name,max_timestamp,'customer'))
+        connection.commit()
