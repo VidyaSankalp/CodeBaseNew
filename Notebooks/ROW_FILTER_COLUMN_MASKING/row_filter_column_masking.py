@@ -7,15 +7,20 @@
 
 # MAGIC %sql
 # MAGIC
-# MAGIC DROP FUNCTION IF EXISTS lakehouse_dev.health_care.row_filter;
+# MAGIC DROP FUNCTION IF EXISTS lakehouse.test.row_filter;
 # MAGIC
-# MAGIC CREATE FUNCTION lakehouse_dev.health_care.row_filter(type STRING)
-# MAGIC RETURN IF(is_member('admins'), true, type='CHARGE');
+# MAGIC CREATE FUNCTION lakehouse.test.row_filter(type STRING)
+# MAGIC RETURN IF(is_account_group_member('test'), true, type='CHARGE');
+
+# COMMAND ----------
+
+# MAGIC %sql 
+# MAGIC SELECT * FROM lakehouse.test.claims_transcations
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC ALTER TABLE lakehouse_dev.health_care.delta_claims_transcations SET ROW FILTER lakehouse_dev.health_care.row_filter ON (type);
+# MAGIC ALTER TABLE lakehouse.test.claims_transcations SET ROW FILTER lakehouse.test.row_filter ON (type);
 
 # COMMAND ----------
 
@@ -47,7 +52,7 @@
 # MAGIC CREATE OR REPLACE VIEW lakehouse_dev.health_care.delta_claims_transcations_view AS
 # MAGIC SELECT
 # MAGIC   id,
-# MAGIC   CASE WHEN is_member('admins') THEN NOTES  ELSE hash(NOTES) END AS notes,
+# MAGIC   CASE WHEN is_member('admins') THEN NOTES  ELSE md5(NOTES) END AS notes,
 # MAGIC   claimid,
 # MAGIC   chargeid,
 # MAGIC   amount
