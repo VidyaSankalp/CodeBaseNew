@@ -22,8 +22,6 @@ def baby_names_raw():
   df_renamed_column = df.withColumnRenamed("First Name", "First_Name")
   return df_renamed_column
 
-# COMMAND ----------
-
 @dlt.table(
   comment="New York popular baby first name data cleaned and prepared for analysis."
 )
